@@ -1,0 +1,14 @@
+{
+  "name": "probyuti-site",
+  "version": "1.0.0",
+  "description": "ПроБьюти — студия красоты, полноценный веб-сайт",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "express": "^5.1.0"
+  }
+}
