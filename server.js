@@ -19,9 +19,11 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 
 const ROOT = __dirname;
-const DB_DIR = path.join(ROOT, 'db');
+// Папка данных: на хостинге с примонтированным диском можно задать DATA_DIR,
+// иначе используется локальная ./db (создаётся из seed.json при первом старте).
+const DB_DIR = process.env.DATA_DIR || path.join(ROOT, 'db');
 const DATA_FILE = path.join(DB_DIR, 'data.json');
-const SEED_FILE = path.join(DB_DIR, 'seed.json');
+const SEED_FILE = path.join(ROOT, 'db', 'seed.json'); // сид всегда из кода (в репо)
 const UPLOAD_DIR = path.join(DB_DIR, 'uploads');
 const PORT = process.env.PORT || 3000;
 const TOKEN_TTL = 1000 * 60 * 60 * 12; // 12 часов
@@ -34,6 +36,25 @@ function ensureDirs() {
   if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
+// Публичные ассеты фронта (копируются на диск данных, чтобы /uploads переживал рестарт диска)
+function ensureAssets() {
+  const dst = path.join(UPLOAD_DIR, 'seed');
+  try {
+    if (!fs.existsSync(dst)) fs.mkdirSync(dst, { recursive: true });
+    const marker = path.join(dst, '.seeded');
+    if (fs.existsSync(marker)) return;
+    const gallerySrc = path.join(ROOT, 'assets', 'gallery');
+    if (fs.existsSync(gallerySrc)) {
+      for (const f of fs.readdirSync(gallerySrc)) {
+        const s = path.join(gallerySrc, f);
+        const d = path.join(dst, f);
+        if (fs.statSync(s).isFile() && !fs.existsSync(d)) fs.copyFileSync(s, d);
+      }
+    }
+    fs.writeFileSync(marker, new Date().toISOString(), 'utf8');
+  } catch (e) { /* не критично: сайт работает и без картинок */ }
+}
+
 function ensureIds(services) {
   (services || []).forEach((s, i) => {
     if (!s.id) s.id = 's' + (i + 1) + '_' + (s.cat || 'x');
@@ -42,8 +63,12 @@ function ensureIds(services) {
 }
 
 function defaultData() {
-  const seed = fs.existsSync(SEED_FILE)
-    ? JSON.parse(fs.readFileSync(SEED_FILE, 'utf8'))
+  // сид: штатный ./db/seed.json из кода (он в репозитории и деплоится вместе с ним);
+  // рядом с DATA_DIR ищем только если штатного нет (локальный оверрайд).
+  const seedPath = fs.existsSync(SEED_FILE) ? SEED_FILE
+    : (fs.existsSync(path.join(DB_DIR, 'seed.json')) ? path.join(DB_DIR, 'seed.json') : null);
+  const seed = seedPath
+    ? JSON.parse(fs.readFileSync(seedPath, 'utf8'))
     : { services: [], settings: {}, gallery: { nails: [], pedi: [], lashes: [], brows: [] } };
   return {
     admin: { username: 'admin', passHash: bcrypt.hashSync(ADMIN_DEFAULT_PASSWORD, 10) },
@@ -65,6 +90,7 @@ function defaultData() {
 
 function loadData() {
   ensureDirs();
+  ensureAssets();
   if (!fs.existsSync(DATA_FILE)) {
     const d = defaultData();
     fs.writeFileSync(DATA_FILE, JSON.stringify(d, null, 2), 'utf8');

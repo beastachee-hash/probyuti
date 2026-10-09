@@ -1,3 +1,9 @@
+# Timeweb Cloud Apps — конфиг деплоя (панель: Apps → из GitHub).
+# build: npm ci ; start: npm start ; порт: из env PORT (сервер уже слушает process.env.PORT).
+# Постоянное хранилище: примонтировать сетевой диск в /app/db через переменную DATA_DIR=/app/db,
+# иначе данные живут в ./db и создаются из db/seed.json при первом старте.
+# Переменная окружения: ADMIN_PASSWORD (пароль админа), healthcheck: GET /
+# --- Render (старый хостинг, оставлен для совместимости) ---
 services:
   - type: web
     name: probyuti
