@@ -62,12 +62,12 @@ function renderAdmin() {
 /* ================= ЭКРАН ВХОДА ================= */
 function renderLogin(body) {
   body.innerHTML = `
-    <p class="admin__hint">Введите пароль администратора (серверная проверка)</p>
+    <!-- подсказка входа отключена: учётные данные не показываются публично -->
     <form class="admin-form" id="admin-login-form">
       <input class="admin-input" type="password" id="admin-pass" placeholder="Пароль" autocomplete="current-password">
       <button class="admin-btn admin-btn--primary" type="submit">Войти</button>
     </form>
-    <p class="admin__hint admin__hint--muted">Логин по умолчанию: <code>admin</code>, пароль: <code>probyuti2026</code> — смените его в разделе «Настройки».</p>`;
+    `;
   document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = document.getElementById('admin-pass');

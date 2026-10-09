@@ -54,7 +54,7 @@ npm start   # http://localhost:3000
 ```
 
 - Данные — в `db/data.json` (создаётся из `db/seed.json` при первом старте); фото с устройства — в `db/uploads/`.
-- Вход админа — `POST /api/admin/login` (bcrypt-хеш, токен на 12 ч в `sessionStorage`). По умолчанию `admin / probyuti2026`.
+- Вход админа — `POST /api/admin/login` (bcrypt-хеш, токен на 12 ч в `sessionStorage`). Пароль задаётся через env `ADMIN_PASSWORD`, в коде и в интерфейсе не показывается.
 - `db/`, `node_modules/`, `server.js` закрыты от раздачи (404).
 - Без сервера сайт тоже работает — fallback на `localStorage` + сиды.
 
