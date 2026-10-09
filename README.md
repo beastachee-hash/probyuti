@@ -87,6 +87,24 @@ npm start     # http://localhost:3000 — сайт + API + админка
 
 Нужен Node-хостинг (сервер + API): Timeweb Cloud, Reg.ru VPS, Railway, Render, Fly.io и т.п. Статический хостинг (Netlify/GitHub Pages) подойдёт только для витрины без серверной админки. После выбора домена замените `https://probyuti.ru/` в `index.html` (canonical, og) и `robots.txt` на реальный адрес.
 
+### Oracle Cloud Always Free (рекомендуем — бесплатно навсегда, данные на диске)
+
+Создайте бесплатный инстанс (Ubuntu, ARM Ampere), в панели сети Oracle **откройте входящий порт 3000** (Security List → Ingress → TCP 3000, source `0.0.0.0/0`), затем на сервере выполните:
+
+```bash
+sudo apt-get update -y && sudo apt-get install -y git
+git clone https://github.com/beastachee-hash/probyuti.git
+cd probyuti
+# задайте свой пароль админа (необязательно, иначе дефолтный):
+export ADMIN_PASSWORD='ваш-надёжный-пароль'
+bash deploy.sh
+```
+
+`deploy.sh` сам поставит Node 20 + PM2, скачает код, установит зависимости, запустит сервер и повесит автозапуск при перезагрузке. Сайт откроется по `http://<публичный_IP>:3000`.
+
+Управление: `pm2 status`, `pm2 logs probyuti`, `pm2 restart probyuti`. Чтобы передеплоить после `git pull` — просто снова `bash deploy.sh`.
+
+
 ## Правка контента
 
 - **Цены/услуги**: массив `SERVICES` в `app.js`
