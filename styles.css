@@ -72,7 +72,7 @@ body::before {
 
 /* ================== АУРОРОВЫЕ ОРБЫ ================== */
 .bg-decor { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-.orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5; will-change: transform; }
+.orb { position: absolute; border-radius: 50%; filter: blur(30px); opacity: .5; }
 .orb--1 {
   width: 46vw; height: 46vw; top: -12vw; left: -10vw;
   background: radial-gradient(circle, rgba(164, 77, 74, .55), transparent 65%);
@@ -205,7 +205,7 @@ main { position: relative; z-index: 2; max-width: 1200px; margin: 0 auto; }
 .hero__blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(60px);
+  filter: blur(40px);
   opacity: .6;
   pointer-events: none;
   z-index: 0;
@@ -1748,4 +1748,38 @@ select.admin-input { cursor: pointer; }
   .stat { padding: 15px 10px; }
   .service-card__name { font-size: 16.5px; }
   .hero__title { letter-spacing: 0; }
+}
+
+
+/* ============ PERFORMANCE (GPU) ============ */
+/* backdrop-filter заставляет GPU пересчитывать размытие каждый кадр при skrolle
+   i animaciyah -> malo kaderov, lagi na slabih ustroystvah. Otklyuchaem ego:
+   steklyannyy vid dayut poluprozrachnye fony i border - bez blur. */
+*, *::before, *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ============ PERFORMANCE (рендер/скролл) ============ */
+/* content-visibility:auto — браузер пропускает отрисовку карточек вне экрана.
+   contain-intrinsic-size резервирует место, чтобы не прыгала высота при скролле.
+   Это резко снижает работу layout/paint -> плавный скролл на слабых устройствах. */
+.service-card,
+.review-card,
+.gitem,
+.bento__tile,
+.stat {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+}
+
+/* Картинки декодируются вне основного потока, чуть мягче рендерятся при появлении */
+img {
+  content-visibility: auto;
+}
+
+/* Убираем подёргивание при появлении изображений: фон-заглушка = цвет стекла */
+.gitem,
+.review-card__photos img {
+  background: rgba(255, 255, 255, 0.05);
 }

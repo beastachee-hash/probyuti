@@ -61,7 +61,7 @@ git push
 2. **Создать проект** → подключи **GitHub-репозиторий** `probyuti-site`.
 3. Layero определит `Node.js` по `package.json`. Проверь настройки сборки:
    - **Команда запуска:** `npm start`
-   - **Версия Node:** 20 (`engines.node: 20.x`)
+   - **Версия Node:** любая из 20 / 22 / 24 (в коде `engines.node: >=20`)
    - **Порт:** из `PORT` — вручную **не задавай**.
 4. **Переменные окружения** → добавь `YDISK_TOKEN`, `YDISK_ROOT`, `ADMIN_PASSWORD` из Шага 2.
 5. **Deploy** → дождись сборки (`npm install` + `npm start`).
@@ -116,9 +116,16 @@ git push
 
 ---
 
-## ❓ Если git не установлен
+## ✅ Git у тебя уже работает
 
-В этой системе `git` ещё не установлен. Варианты:
-- **Установить:** скачай с **https://git-scm.com/download/win** (Git for Windows) → при установи отметь «Add to PATH» → перезапусти терминал.
-- **Или через GitHub Desktop:** **https://desktop.github.com** — GUI, без консоли.
+`git` установлен, репозиторий создан и запушен:
+`https://github.com/beastachee-hash/probyuti` (ветка `master`).
+Для обновления сайта достаточно в папке проекта:
+```bash
+cd G:\Cline\probyuti-site
+git add -A
+git commit -m "описание изменений"
+git push
+```
+Layero увидит push в подключённую ветку и сам пересоберёт сайт.
 

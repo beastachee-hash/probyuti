@@ -119,7 +119,7 @@ function reviewCard(r, i) {
 
   const photos = (r.images || []).length
     ? `<div class="review-card__photos">${r.images
-        .map((src) => `<a href="${src.replace('size=s', 'size=b')}" target="_blank" rel="noopener"><img src="${src}" alt="Фото отзыва" loading="lazy"></a>`)
+        .map((src) => `<a href="${src.replace('size=s', 'size=b')}" target="_blank" rel="noopener"><img src="${src}" alt="Фото отзыва" loading="lazy" decoding="async"></a>`)
         .join('')}</div>`
     : '';
 

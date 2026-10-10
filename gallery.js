@@ -49,7 +49,7 @@ function renderGallery() {
   grid.innerHTML = photos.map((src, i) => `
     <button class="gitem" data-src="${src}" data-idx="${i}" type="button"
             style="animation-delay:${Math.min(i, 10) * 45}ms">
-      <img src="${src}" alt="Работа: ${galCat}" loading="lazy" referrerpolicy="no-referrer">
+      <img src="${src}" alt="Работа: ${galCat}" loading="lazy" decoding="async" referrerpolicy="no-referrer">
       <span class="gitem__zoom" aria-hidden="true">⤢</span>
     </button>`).join('');
 

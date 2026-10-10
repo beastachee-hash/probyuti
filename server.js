@@ -126,6 +126,15 @@ app.use(express.static(ROOT, {
         rel === 'node_modules' || rel.startsWith('node_modules/') ||
         rel === 'server.js' || rel === 'package.json' || rel === 'package-lock.json') {
       res.statusCode = 404;
+      return;
+    }
+    // КЭШ: html отдаём всегда свежим, а прочую статику (css/js/шрифты/картинки)
+    // кэшируем надолго — чтобы Cloudflare раздавал её со своих узлов по миру,
+    // и она не ехала каждый раз через домашний интернет до посетителя.
+    if (rel.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=604800, must-revalidate');
     }
   },
 }));

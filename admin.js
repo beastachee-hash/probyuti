@@ -190,25 +190,57 @@ function renderPhotoEditor(cat) {
     flashSaved();
   });
 
-  document.getElementById('photo-file').addEventListener('change', (e) => {
+  // сжимаем фото перед отправкой: макс. сторона 1200px, JPEG ~0.82.
+  // с телефона кадры весят 2–5 МБ — без ресайза галерея «тормозит при скролле».
+  function fileToDataURL(file, maxSide, quality) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('не удалось прочитать файл'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('не удалось открыть изображение'));
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxSide || height > maxSide) {
+            const r = Math.min(maxSide / width, maxSide / height);
+            width = Math.round(width * r);
+            height = Math.round(height * r);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          try {
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          } catch (e) {
+            // PNG с прозрачностью и т.п. — fallback на оригинал
+            resolve(reader.result);
+          }
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  document.getElementById('photo-file').addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        // сервер сохранит файл в db/uploads и вернёт /uploads/…
-        const src = await SalonAPI.uploadPhoto(cat, reader.result);
-        if (!STORE.gallery[cat]) STORE.gallery[cat] = [];
-        if (src && !STORE.gallery[cat].includes(src)) STORE.gallery[cat].push(src);
-        renderPhotoEditor(cat);
-        renderGalleryChips();
-        renderGallery();
-        flashSaved();
-      } catch (err) {
-        showPhotoErr(ed, 'Не удалось загрузить файл: ' + err.message);
-      }
-    };
-    reader.readAsDataURL(file);
+    e.target.value = '';
+    try {
+      const dataUrl = await fileToDataURL(file, 1200, 0.82);
+      // сервер сохранит файл в db/uploads и вернёт /uploads/…
+      const src = await SalonAPI.uploadPhoto(cat, dataUrl);
+      if (!STORE.gallery[cat]) STORE.gallery[cat] = [];
+      if (src && !STORE.gallery[cat].includes(src)) STORE.gallery[cat].push(src);
+      renderPhotoEditor(cat);
+      renderGalleryChips();
+      renderGallery();
+      flashSaved();
+    } catch (err) {
+      showPhotoErr(ed, 'Не удалось загрузить файл: ' + err.message);
+    }
   });
 
   ed.querySelectorAll('.photo-thumb__del').forEach((btn) => {
