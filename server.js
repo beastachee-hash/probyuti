@@ -17,43 +17,15 @@ const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const storage = require('./storage');
 
 const ROOT = __dirname;
-// Папка данных: на хостинге с примонтированным диском можно задать DATA_DIR,
-// иначе используется локальная ./db (создаётся из seed.json при первом старте).
-const DB_DIR = process.env.DATA_DIR || path.join(ROOT, 'db');
-const DATA_FILE = path.join(DB_DIR, 'data.json');
-const SEED_FILE = path.join(ROOT, 'db', 'seed.json'); // сид всегда из кода (в репо)
-const UPLOAD_DIR = path.join(DB_DIR, 'uploads');
+const DB_DIR = storage.DB_DIR;
+const UPLOAD_DIR = storage.UPLOAD_DIR;
 const PORT = process.env.PORT || 3000;
 const TOKEN_TTL = 1000 * 60 * 60 * 12; // 12 часов
 // Пароль админа по умолчанию можно задать через env (для хостинга)
 const ADMIN_DEFAULT_PASSWORD = process.env.ADMIN_PASSWORD || 'probyuti2026';
-
-/* ---------- работа с JSON-БД ---------- */
-function ensureDirs() {
-  if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
-  if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-
-// Публичные ассеты фронта (копируются на диск данных, чтобы /uploads переживал рестарт диска)
-function ensureAssets() {
-  const dst = path.join(UPLOAD_DIR, 'seed');
-  try {
-    if (!fs.existsSync(dst)) fs.mkdirSync(dst, { recursive: true });
-    const marker = path.join(dst, '.seeded');
-    if (fs.existsSync(marker)) return;
-    const gallerySrc = path.join(ROOT, 'assets', 'gallery');
-    if (fs.existsSync(gallerySrc)) {
-      for (const f of fs.readdirSync(gallerySrc)) {
-        const s = path.join(gallerySrc, f);
-        const d = path.join(dst, f);
-        if (fs.statSync(s).isFile() && !fs.existsSync(d)) fs.copyFileSync(s, d);
-      }
-    }
-    fs.writeFileSync(marker, new Date().toISOString(), 'utf8');
-  } catch (e) { /* не критично: сайт работает и без картинок */ }
-}
 
 function ensureIds(services) {
   (services || []).forEach((s, i) => {
@@ -63,6 +35,7 @@ function ensureIds(services) {
 }
 
 function defaultData() {
+  const SEED_FILE = path.join(ROOT, 'db', 'seed.json'); // сид всегда из кода (в репо)
   // сид: штатный ./db/seed.json из кода (он в репозитории и деплоится вместе с ним);
   // рядом с DATA_DIR ищем только если штатного нет (локальный оверрайд).
   const seedPath = fs.existsSync(SEED_FILE) ? SEED_FILE
@@ -88,32 +61,19 @@ function defaultData() {
   };
 }
 
-function loadData() {
-  ensureDirs();
-  ensureAssets();
-  if (!fs.existsSync(DATA_FILE)) {
-    const d = defaultData();
-    fs.writeFileSync(DATA_FILE, JSON.stringify(d, null, 2), 'utf8');
-    return d;
-  }
-  const loaded = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  // страховка: если файл неполный (старый формат) — дозаполняем из seed
+function mergeLoaded(loaded) {
+  // страховка: если запись неполная (старый формат) — дозаполняем из seed
   const base = defaultData();
-  const merged = {
+  return {
     admin: loaded.admin || base.admin,
     services: ensureIds(Array.isArray(loaded.services) ? loaded.services : base.services),
     categories: loaded.categories || base.categories,
     settings: Object.assign(base.settings, loaded.settings || {}),
     gallery: Object.assign(base.gallery, loaded.gallery || {}),
   };
-  return merged;
 }
 
-function saveData(d) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(d, null, 2), 'utf8');
-}
-
-/* ---------- токены сессий (в памяти, сброс при рестарте) ---------- */
+/* ---------- токены сессий (в памяти, сброс при рестарте/холодном старте) ---------- */
 const tokens = new Map(); // token -> { username, expires }
 
 function issueToken(username) {
@@ -130,12 +90,14 @@ function authOk(req) {
   return true;
 }
 
-
 /* ---------- Express ---------- */
 const app = express();
 app.use(express.json({ limit: '25mb' }));
 
-let DATA = loadData();
+// DATA наполняется в bootstrap() ниже (локально из файла / облако из Postgres)
+let DATA = defaultData();
+// Сохранение состояния в хранилище (Postgres или файл)
+const persist = () => storage.saveData(DATA);
 
 /* ---------- статика сайта (без служебных папок!) ---------- */
 app.use(express.static(ROOT, {
@@ -153,7 +115,23 @@ app.use(express.static(ROOT, {
 // точечный запрет: прямые запросы к служебному
 app.use(['/db', '/node_modules', '/server.js', '/package.json', '/package-lock.json'],
   (req, res) => res.status(404).send('Not found'));
-app.use('/uploads', express.static(UPLOAD_DIR));
+// раздача загруженных фото: только в локальном режиме.
+// в облаке фото лежат в Yandex Object Storage и отдаются напрямую по публичному URL.
+if (!storage.USE_S3) app.use('/uploads', express.static(UPLOAD_DIR));
+
+// фото с Яндекс.Диска: сервер читает байты с Диска и отдаёт их с кэшированием.
+// (прямая ссылка Яндекса — временная и ведёт на HTML-страницу, поэтому отдаём сами)
+app.get('/photos/:name', async (req, res) => {
+  try {
+    const img = await storage.readImage(req.params.name);
+    if (!img) return res.status(404).end();
+    res.setHeader('Content-Type', img.contentType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.end(img.buffer);
+  } catch (e) {
+    res.status(500).end();
+  }
+});
 
 /* ============ ПУБЛИЧНЫЙ API ============ */
 
@@ -194,7 +172,7 @@ app.post('/api/admin/password', guard, (req, res) => {
     return res.status(400).json({ error: 'Новый пароль слишком короткий' });
   }
   DATA.admin.passHash = bcrypt.hashSync(String(newPassword), 10);
-  saveData(DATA);
+  persist();
   res.json({ ok: true });
 });
 
@@ -209,7 +187,7 @@ app.post('/api/admin/save', guard, (req, res) => {
     if (s.bookingUrl != null) DATA.settings.bookingUrl = s.bookingUrl;
     if (s.hours) DATA.settings.hours = s.hours;
   }
-  saveData(DATA);
+  persist();
   res.json({ ok: true });
 });
 
@@ -217,23 +195,22 @@ app.post('/api/admin/gallery', guard, (req, res) => {
   const { cat, url } = req.body || {};
   if (!DATA.gallery[cat]) DATA.gallery[cat] = [];
   DATA.gallery[cat].push({ src: url });
-  saveData(DATA);
+  persist();
   res.json({ ok: true, gallery: DATA.gallery });
 });
 
-app.post('/api/admin/upload', guard, (req, res) => {
+app.post('/api/admin/upload', guard, async (req, res) => {
   const { cat, dataUrl } = req.body || {};
-  const m = String(dataUrl || '').match(/^data:(image\/[\w+]+);base64,(.+)$/);
-  if (!m) return res.status(400).json({ error: 'Некорректное изображение' });
-  const ext = (m[1].split('/')[1] || 'jpg').replace(/[^a-z]/gi, '');
   const safeCat = (cat || 'misc').replace(/[^a-z]/gi, '');
-  const fname = `${safeCat}_${Date.now()}_${crypto.randomBytes(3).toString('hex')}.${ext}`;
-  fs.writeFileSync(path.join(UPLOAD_DIR, fname), Buffer.from(m[2], 'base64'));
-  const src = '/uploads/' + fname;
-  if (!DATA.gallery[safeCat]) DATA.gallery[safeCat] = [];
-  DATA.gallery[safeCat].push({ src });
-  saveData(DATA);
-  res.json({ ok: true, src, gallery: DATA.gallery });
+  try {
+    const src = await storage.uploadImage(safeCat, dataUrl);
+    if (!DATA.gallery[safeCat]) DATA.gallery[safeCat] = [];
+    DATA.gallery[safeCat].push({ src });
+    persist();
+    res.json({ ok: true, src, gallery: DATA.gallery });
+  } catch (e) {
+    res.status(400).json({ error: 'Не удалось загрузить изображение' });
+  }
 });
 
 app.post('/api/admin/gallery/remove', guard, (req, res) => {
@@ -246,7 +223,7 @@ app.post('/api/admin/gallery/remove', guard, (req, res) => {
     } else if (DATA.gallery[cat][index] != null) {
       DATA.gallery[cat].splice(index, 1);
     }
-    saveData(DATA);
+    persist();
   }
   res.json({ ok: true, gallery: DATA.gallery });
 });
@@ -372,7 +349,7 @@ app.post('/api/admin/apply-dikidi', guard, (req, res) => {
       if (u.dikidiId) s.dikidiId = String(u.dikidiId);
     }
   });
-  saveData(DATA);
+  persist();
   res.json({ ok: true, services: DATA.services });
 });
 
@@ -397,7 +374,7 @@ app.post('/api/admin/import-dikidi', guard, (req, res) => {
     });
     added++;
   });
-  saveData(DATA);
+  persist();
   res.json({ ok: true, added, services: DATA.services });
 });
 
@@ -409,8 +386,14 @@ app.get(/^\/(?!api\/|uploads\/).*/, (req, res, next) => {
 });
 
 /* ---------- старт ---------- */
-app.listen(PORT, () => {
-  console.log(`ПроБьюти · сервер запущен: http://localhost:${PORT}`);
-  // console.log(`Админ-логин: ... / пароль по умолчанию: ...`); // скрыто: не выводить учётные данные в логи
-});
+async function bootstrap() {
+  // загружаем состояние: Яндекс.Диск / Postgres в облаке / файл локально; null → дефолт + запись
+  const loaded = await storage.loadData();
+  DATA = loaded ? mergeLoaded(loaded) : defaultData();
+  if (!loaded) await persist();
+  app.listen(PORT, () => {
+    console.log(`ПроБьюти · сервер запущен: http://localhost:${PORT}`);
+  });
+}
+bootstrap();
 
