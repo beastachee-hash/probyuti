@@ -12,3 +12,4 @@ db/uploads/*
 *.log
 .DS_Store
 Thumbs.db
+server.pid
