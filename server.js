@@ -386,14 +386,27 @@ app.get(/^\/(?!api\/|uploads\/).*/, (req, res, next) => {
 });
 
 /* ---------- старт ---------- */
+// ВАЖНО: сначала открываем порт, потом грузим данные.
+// Облако (Layero) проверяет готовность по порту — если ждать загрузки
+// с Диска/БД до listen, а там ошибка/таймаут, сервер не поднимется.
 async function bootstrap() {
-  // загружаем состояние: Яндекс.Диск / Postgres в облаке / файл локально; null → дефолт + запись
-  const loaded = await storage.loadData();
-  DATA = loaded ? mergeLoaded(loaded) : defaultData();
-  if (!loaded) await persist();
-  app.listen(PORT, () => {
-    console.log(`ПроБьюти · сервер запущен: http://localhost:${PORT}`);
+  // слушаем на всех интерфейсах сразу, чтобы хост увидел порт мгновенно
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`ПроБьюти · сервер запущен на порту ${PORT}`);
   });
+
+  // догружаем состояние в фоне; любая ошибка хранилища не роняет сервер
+  let loaded = null;
+  try {
+    loaded = await storage.loadData();
+  } catch (e) {
+    console.error('[storage] ошибка загрузки состояния, стартуем на дефолте:', e.message);
+  }
+  DATA = loaded ? mergeLoaded(loaded) : defaultData();
+  if (!loaded) {
+    try { await persist(); } catch (e) { console.error('[storage] ошибка первичного сохранения:', e.message); }
+  }
+  console.log(`[state] услуг загружено: ${DATA.services.length}`);
 }
 bootstrap();
 
