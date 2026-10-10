@@ -70,37 +70,27 @@ body::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
 }
 
-/* ================== АУРОРОВЫЕ ОРБЫ ================== */
+/* ================== АУРОРОВЫЙ ФОН ================== */
+/* Орбы — статичные градиенты. Убрали бесконечную анимацию дрейфа: постоянное
+   движение 4 размытых пятен жгло GPU каждый кадр даже в покое -> низкий FPS
+   при прокрутке картинок на слабых устройствах. Градиенты и глубина остались. */
 .bg-decor { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
 .orb { position: absolute; border-radius: 50%; filter: blur(30px); opacity: .5; }
 .orb--1 {
   width: 46vw; height: 46vw; top: -12vw; left: -10vw;
   background: radial-gradient(circle, rgba(164, 77, 74, .55), transparent 65%);
-  animation: orbDrift1 22s ease-in-out infinite;
 }
 .orb--2 {
   width: 38vw; height: 38vw; top: 30vh; right: -12vw;
   background: radial-gradient(circle, rgba(217, 178, 106, .28), transparent 65%);
-  animation: orbDrift2 26s ease-in-out infinite;
 }
 .orb--3 {
   width: 42vw; height: 42vw; bottom: -16vw; left: 18vw;
   background: radial-gradient(circle, rgba(96, 44, 62, .55), transparent 65%);
-  animation: orbDrift1 30s ease-in-out infinite reverse;
 }
 .orb--4 {
   width: 26vw; height: 26vw; top: 55vh; left: 38vw;
   background: radial-gradient(circle, rgba(210, 114, 107, .25), transparent 65%);
-  animation: orbDrift2 24s ease-in-out infinite reverse;
-}
-
-@keyframes orbDrift1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50%      { transform: translate(5vw, 4vh) scale(1.12); }
-}
-@keyframes orbDrift2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50%      { transform: translate(-4vw, -5vh) scale(1.08); }
 }
 
 /* ================== ВКЛАДКИ / ПАНЕЛИ ================== */

@@ -3,13 +3,16 @@
   "version": "1.0.0",
   "description": "ПроБьюти — студия красоты, полноценный веб-сайт",
   "main": "server.js",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
+    "compression": "^1.8.2",
     "express": "^5.1.0"
   },
   "optionalDependencies": {

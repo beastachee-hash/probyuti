@@ -33,8 +33,16 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
+const compression = require('compression');
 const bcrypt = require('bcryptjs');
 const storage = require('./storage');
+
+// какие типы сжимать (по умолчанию compression тоже сжимает, но явно и без картинок)
+function shouldCompress(req, res) {
+  const type = res.getHeader('Content-Type') || '';
+  if (/image\/|video\/|audio\/|application\/(zip|gzip|pdf)/i.test(type)) return false;
+  return compression.filter(req, res);
+}
 
 const ROOT = __dirname;
 const DB_DIR = storage.DB_DIR;
@@ -111,6 +119,10 @@ function authOk(req) {
 const app = express();
 app.use(express.json({ limit: '25mb' }));
 
+// СЖАТИЕ: gzip/brotli для текста (html/css/js/json/шрифты). Уменьшает трафик
+// через домашний канал и ускоряет отдачу гостям. Не сжимаем картинки (у них своё сжатие).
+app.use(compression({ filter: shouldCompress }));
+
 // DATA наполняется в bootstrap() ниже (локально из файла / облако из Postgres)
 let DATA = defaultData();
 // Сохранение состояния в хранилище (Postgres или файл)
@@ -124,7 +136,9 @@ app.use(express.static(ROOT, {
     const rel = path.relative(ROOT, filePath).replace(/\\/g, '/');
     if (rel === 'db' || rel.startsWith('db/') ||
         rel === 'node_modules' || rel.startsWith('node_modules/') ||
-        rel === 'server.js' || rel === 'package.json' || rel === 'package-lock.json') {
+        rel === 'server.js' || rel === 'package.json' || rel === 'package-lock.json' ||
+        rel === '.env' || rel.startsWith('.env.') || rel === '.git' || rel.startsWith('.git/') ||
+        rel === '.gitignore' || rel === '.nojekyll' || rel === 'server.pid') {
       res.statusCode = 404;
       return;
     }
@@ -139,7 +153,7 @@ app.use(express.static(ROOT, {
   },
 }));
 // точечный запрет: прямые запросы к служебному
-app.use(['/db', '/node_modules', '/server.js', '/package.json', '/package-lock.json'],
+app.use(['/db', '/node_modules', '/server.js', '/package.json', '/package-lock.json', '/.env', '/.git', '/.gitignore', '/.nojekyll'],
   (req, res) => res.status(404).send('Not found'));
 // раздача загруженных фото: только в локальном режиме.
 // в облаке фото лежат в Yandex Object Storage и отдаются напрямую по публичному URL.
