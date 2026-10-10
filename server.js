@@ -10,6 +10,23 @@
    ADMIN_PASSWORD, меняется через API /api/admin/password).
    ============================================================ */
 
+/* --- загрузка .env (если файл есть) — ДО чтения переменных --- */
+(function loadEnv() {
+  try {
+    const fsx = require('fs');
+    const p = require('path').join(__dirname, '.env');
+    if (!fsx.existsSync(p)) return;
+    for (const line of fsx.readFileSync(p, 'utf8').split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/i);
+      if (!m) continue;
+      let v = m[2].trim();
+      if (/^["'].*["']$/.test(v)) v = v.slice(1, -1);
+      if (process.env[m[1]] === undefined) process.env[m[1]] = v;
+    }
+    console.log('[env] загружен .env');
+  } catch (e) { console.warn('[env] .env не прочитан:', e.message); }
+})();
+
 'use strict';
 
 const path = require('path');

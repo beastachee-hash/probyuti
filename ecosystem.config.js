@@ -1,22 +1,24 @@
+// Конфигурация PM2 — держит сайт запущенным и поднимает его после перезагрузки сервера.
+// На сервере (Ubuntu) из папки проекта выполнить:
+//   npm install
+//   npm install -g pm2
+//   pm2 start ecosystem.config.js
+//   pm2 save
+//   pm2 startup        (выполнит команду, которую pm2 напечатает)
 module.exports = {
   apps: [
     {
       name: 'probyuti',
       script: 'server.js',
-      cwd: 'G:/Cline/probyuti-site',
+      cwd: __dirname,
+      instances: 1,
+      exec_mode: 'fork',
       autorestart: true,
-      max_restarts: 50,
+      max_restarts: 10,
       env: {
-        PORT: '3000',
-        ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'probyuti2026'
-      }
+        NODE_ENV: 'production',
+        PORT: process.env.PORT || 3000,
+      },
     },
-    {
-      name: 'probyuti-tunnel',
-      script: 'G:/Cline/start_tunnel.cmd',
-      autorestart: true,
-      max_restarts: 100,
-      restart_delay: 8000
-    }
-  ]
+  ],
 };
