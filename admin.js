@@ -109,6 +109,7 @@ function renderDashboard(body) {
     <footer class="admin-foot">
       <button class="admin-btn" id="admin-logout" type="button">Выйти</button>
       <span class="admin-save-hint" id="admin-save-hint"></span>
+      <button class="admin-btn admin-btn--primary" id="admin-save" type="button" title="Сохранить изменения на этой вкладке">💾 Сохранить</button>
     </footer>`;
 
   document.getElementById('admin-tabs').querySelectorAll('.admin-tab').forEach((t) => {
@@ -119,6 +120,7 @@ function renderDashboard(body) {
     });
   });
   document.getElementById('admin-logout').addEventListener('click', doLogout);
+  document.getElementById('admin-save').addEventListener('click', adminSaveActive);
 
   renderPhotosPane(document.querySelector('[data-pane="photos"]'));
   renderServicesPane(document.querySelector('[data-pane="services"]'));
@@ -453,6 +455,77 @@ function flashSaved() {
     el.textContent = '';
     el.classList.remove('ok');
   }, 2000);
+}
+
+/* ---------- единая кнопка «💾 Сохранить»: фиксирует активную вкладку ---------- */
+async function adminSaveActive() {
+  const pane = document.querySelector('.admin-tabpane.active');
+  const tab = pane ? pane.dataset.pane : null;
+  const btn = document.getElementById('admin-save');
+  const setBusy = (busy, label) => {
+    if (!btn) return;
+    btn.disabled = busy;
+    btn.textContent = label;
+  };
+  setBusy(true, 'Сохраняем…');
+  try {
+    if (tab === 'hours') {
+      SalonAPI.updateHours({
+        weekdays: { from: document.getElementById('h-wd-from').value, to: document.getElementById('h-wd-to').value },
+        weekend:  { from: document.getElementById('h-we-from').value, to: document.getElementById('h-we-to').value },
+      });
+      applyStateToSite();
+      flashSaved();
+      return;
+    }
+    if (tab === 'settings') {
+      SalonAPI.updateSalon({
+        phone: document.getElementById('s-phone').value,
+        phoneHref: document.getElementById('s-phone-href').value,
+        address: document.getElementById('s-address').value,
+        bookingUrl: document.getElementById('s-booking').value,
+      });
+      applyStateToSite();
+      flashSaved();
+      return;
+    }
+    if (tab === 'services') {
+      // перечитываем все строки и фиксируем (страховка, если авто-сохранение где-то не сработало)
+      document.querySelectorAll('#svc-list .svc-row').forEach((row) => {
+        const i = +row.dataset.idx;
+        if (Number.isNaN(i) || !STORE.services[i]) return;
+        const svc = { ...STORE.services[i] };
+        svc.name = row.querySelector('.svc-row__name').value;
+        svc.cat = row.querySelector('.svc-row__cat').value;
+        svc.duration = row.querySelector('.svc-row__dur').value || undefined;
+        const priceVal = row.querySelector('.svc-row__price').value;
+        if (priceVal === '') { delete svc.price; } else { svc.price = +priceVal; }
+        const discEl = row.querySelector('.svc-row__disc');
+        if (discEl && discEl.value !== '') {
+          svc.discount = Math.max(0, Math.min(90, Math.round(+discEl.value || 0)));
+        } else { delete svc.discount; }
+        SalonAPI.updateService(i, svc);
+      });
+      refreshPublic();
+      flashSaved();
+      return;
+    }
+    // фото сохраняются сразу при добавлении — просто подтверждаем состояние
+    if (tab === 'photos') {
+      refreshPublic();
+      flashSaved();
+      return;
+    }
+  } catch (err) {
+    const hint = document.getElementById('admin-save-hint');
+    if (hint) {
+      hint.textContent = '✗ Ошибка сохранения: ' + (err && err.message ? err.message : err);
+      hint.style.color = 'var(--accent)';
+      setTimeout(() => { hint.textContent = ''; hint.style.color = ''; }, 3500);
+    }
+  } finally {
+    setBusy(false, '💾 Сохранить');
+  }
 }
 
 /* ---------- экранирование для вставки в value="…" ---------- */

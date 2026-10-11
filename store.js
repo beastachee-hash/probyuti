@@ -113,14 +113,16 @@ function setStore(raw) {
   ensureIds(raw.services);
   STORE.services = (Array.isArray(raw.services) && raw.services.length)
     ? raw.services : base.services;
-  // галерею сервера берём только если там есть фото,
-  // иначе оставляем сиды из GALLERY_SEED
-  const srvGal = normGallery(raw.gallery || {});
+  // Галерею берём с сервера «как есть», включая пустые категории.
+  // Если админ удалил все фото — они НЕ должны возвращаться из сидов.
+  // Сиды используем только как страховку, если сервер не прислал категорию вовсе.
+  const rawGal = raw.gallery || {};
+  const srvGal = normGallery(rawGal);
   STORE.gallery = {};
   GALLERY_CATS.forEach((c) => {
-    STORE.gallery[c] = (srvGal[c] && srvGal[c].length)
-      ? srvGal[c]
-      : (base.gallery[c] || []);
+    const serverHasCat = Object.prototype.hasOwnProperty.call(rawGal, c)
+      && Array.isArray(rawGal[c]);
+    STORE.gallery[c] = serverHasCat ? srvGal[c] : (base.gallery[c] || []);
   });
 }
 
